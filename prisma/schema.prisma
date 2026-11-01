@@ -1,0 +1,208 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  PENUMPANG
+  PETUGAS
+  ADMIN
+}
+
+enum KelasKereta {
+  EKSEKUTIF
+  BISNIS
+  EKONOMI
+}
+
+enum StatusBayar {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum StatusTiket {
+  BOOKED
+  BOARDED
+}
+
+model User {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nama              String             @db.VarChar(150)
+  email             String             @unique @db.VarChar(150)
+  passwordHash      String             @map("password_hash") @db.VarChar(255)
+  role              UserRole           @default(PENUMPANG)
+  phone             String             @db.VarChar(20)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  pemesanan         Pemesanan[]
+  pushSubscriptions PushSubscription[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model Stasiun {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kodeStasiun String   @unique @map("kode_stasiun") @db.VarChar(10)
+  namaStasiun String   @map("nama_stasiun") @db.VarChar(100)
+  kota        String   @db.VarChar(100)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  ruteAsal    Rute[]   @relation("StasiunAsal")
+  ruteTujuan  Rute[]   @relation("StasiunTujuan")
+
+  @@index([kota])
+  @@map("stasiun")
+}
+
+model Kereta {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  namaKereta String    @map("nama_kereta") @db.VarChar(100)
+  kodeKereta String    @unique @map("kode_kereta") @db.VarChar(20)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  gerbong    Gerbong[]
+  jadwal     Jadwal[]
+
+  @@map("kereta")
+}
+
+model Gerbong {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keretaId     String      @map("kereta_id") @db.Uuid
+  namaGerbong  String      @map("nama_gerbong") @db.VarChar(50)
+  nomorGerbong Int         @map("nomor_gerbong")
+  kelas        KelasKereta
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  kereta       Kereta      @relation(fields: [keretaId], references: [id], onDelete: Cascade)
+  kursi        Kursi[]
+
+  @@unique([keretaId, nomorGerbong])
+  @@index([keretaId])
+  @@map("gerbong")
+}
+
+model Kursi {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  gerbongId   String        @map("gerbong_id") @db.Uuid
+  nomorKursi  String        @map("nomor_kursi") @db.VarChar(10)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  gerbong     Gerbong       @relation(fields: [gerbongId], references: [id], onDelete: Cascade)
+  detailTiket DetailTiket[]
+
+  @@unique([gerbongId, nomorKursi])
+  @@index([gerbongId])
+  @@map("kursi")
+}
+
+model Rute {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  stasiunAsalId   String   @map("stasiun_asal_id") @db.Uuid
+  stasiunTujuanId String   @map("stasiun_tujuan_id") @db.Uuid
+  jarakKm         Decimal  @map("jarak_km") @db.Decimal(8, 2)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  stasiunAsal     Stasiun  @relation("StasiunAsal", fields: [stasiunAsalId], references: [id], onDelete: Restrict)
+  stasiunTujuan   Stasiun  @relation("StasiunTujuan", fields: [stasiunTujuanId], references: [id], onDelete: Restrict)
+  jadwal          Jadwal[]
+  tarif           Tarif[]
+
+  @@unique([stasiunAsalId, stasiunTujuanId])
+  @@map("rute")
+}
+
+model Jadwal {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keretaId       String        @map("kereta_id") @db.Uuid
+  ruteId         String        @map("rute_id") @db.Uuid
+  waktuBerangkat DateTime      @map("waktu_berangkat") @db.Timestamptz(6)
+  waktuTiba      DateTime      @map("waktu_tiba") @db.Timestamptz(6)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  kereta         Kereta        @relation(fields: [keretaId], references: [id], onDelete: Restrict)
+  rute           Rute          @relation(fields: [ruteId], references: [id], onDelete: Restrict)
+  pemesanan      Pemesanan[]
+  detailTiket    DetailTiket[]
+
+  @@index([ruteId, waktuBerangkat])
+  @@map("jadwal")
+}
+
+model Tarif {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ruteId    String      @map("rute_id") @db.Uuid
+  kelas     KelasKereta
+  harga     Decimal     @db.Decimal(12, 2)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  rute      Rute        @relation(fields: [ruteId], references: [id], onDelete: Cascade)
+
+  @@unique([ruteId, kelas])
+  @@map("tarif")
+}
+
+model Pemesanan {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kodeBooking      String        @unique @map("kode_booking") @db.VarChar(12)
+  userId           String        @map("user_id") @db.Uuid
+  jadwalId         String        @map("jadwal_id") @db.Uuid
+  statusPembayaran StatusBayar   @default(PENDING) @map("status_pembayaran")
+  totalBayar       Decimal       @map("total_bayar") @db.Decimal(14, 2)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiredAt        DateTime      @map("expired_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user             User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  jadwal           Jadwal        @relation(fields: [jadwalId], references: [id], onDelete: Restrict)
+  detailTiket      DetailTiket[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([statusPembayaran, expiredAt])
+  @@map("pemesanan")
+}
+
+model DetailTiket {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pemesananId        String      @map("pemesanan_id") @db.Uuid
+  jadwalId           String      @map("jadwal_id") @db.Uuid
+  penumpangNama      String      @map("penumpang_nama") @db.VarChar(150)
+  penumpangIdentitas String      @map("penumpang_identitas") @db.VarChar(50)
+  kursiId            String      @map("kursi_id") @db.Uuid
+  statusTiket        StatusTiket @default(BOOKED) @map("status_tiket")
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  pemesanan          Pemesanan   @relation(fields: [pemesananId], references: [id], onDelete: Cascade)
+  jadwal             Jadwal      @relation(fields: [jadwalId], references: [id], onDelete: Restrict)
+  kursi              Kursi       @relation(fields: [kursiId], references: [id], onDelete: Restrict)
+
+  @@index([pemesananId])
+  @@index([jadwalId, kursiId])
+  @@map("detail_tiket")
+}
+
+model PushSubscription {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  endpoint   String   @db.Text
+  keysP256dh String   @map("keys_p256dh") @db.Text
+  keysAuth   String   @map("keys_auth") @db.Text
+  userAgent  String?  @map("user_agent") @db.VarChar(255)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@index([userId])
+  @@map("push_subscriptions")
+}
