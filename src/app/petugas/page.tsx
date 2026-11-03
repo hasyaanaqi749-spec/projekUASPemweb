@@ -1,98 +1,290 @@
 'use client';
 
-import { logoutAction } from '@/app/actions/authActions';
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function PetugasPage() {
-  const [kode, setKode] = useState('');
-  const [status, setStatus] = useState<string | null>(null);
+interface BoardingPassenger {
+  id: string;
+  kodeBooking: string;
+  namaPenumpang: string;
+  identitas: string;
+  namaKereta: string;
+  posisiKursi: string;
+  statusTiket: 'BOOKED' | 'BOARDED';
+}
 
-  const handleLogout = async () => {
-    await logoutAction();
-    window.location.href = '/login';
+export default function PetugasPortalPage() {
+  const router = useRouter();
+  const [passengers, setPassengers] = useState<BoardingPassenger[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [kodeInput, setKodeInput] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+
+  // Mengambil daftar tiket siap boarding langsung dari Supabase
+  const fetchPassengers = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/petugas');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setPassengers(data.data);
+      } else {
+        throw new Error(data.error || 'Gagal mengambil data boarding');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Gagal memuat data dari Supabase');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCheckin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!kode) return;
-    setStatus(`Tiket ${kode.toUpperCase()} Berhasil Di-Boarding! Kursi tervalidasi.`);
-    setKode('');
+  useEffect(() => {
+    fetchPassengers();
+  }, []);
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('auth_user');
+      localStorage.removeItem('token');
+      document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    } catch (e) {
+      console.error(e);
+    }
+    router.push('/login');
   };
+
+  // Validasi kode booking lewat input/scanner
+  const handleValidateTicket = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!kodeInput.trim()) {
+      setErrorMsg('Masukkan kode booking terlebih dahulu.');
+      return;
+    }
+
+    setIsValidating(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      const res = await fetch('/api/petugas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kodeBooking: kodeInput.trim().toUpperCase() }),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || `Kode booking ${kodeInput} tidak valid atau belum PAID.`);
+      }
+
+      setSuccessMsg(result.message || `Tiket ${kodeInput.toUpperCase()} berhasil divalidasi!`);
+      setKodeInput('');
+      fetchPassengers();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Gagal memvalidasi tiket');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  // Check-in langsung dari kartu penumpang
+  const handleCheckInCard = async (passenger: BoardingPassenger) => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const res = await fetch('/api/petugas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tiketId: passenger.id,
+          kodeBooking: passenger.kodeBooking,
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || 'Gagal melakukan check-in');
+      }
+
+      setSuccessMsg(`Penumpang ${passenger.namaPenumpang} berhasil check-in (BOARDED)!`);
+      setPassengers((prev) =>
+        prev.map((p) => (p.id === passenger.id ? { ...p, statusTiket: 'BOARDED' } : p))
+      );
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Gagal check-in');
+    }
+  };
+
+  const totalSiap = passengers.length;
+  const belumCheckIn = passengers.filter((p) => p.statusTiket !== 'BOARDED').length;
+  const sudahBoarded = passengers.filter((p) => p.statusTiket === 'BOARDED').length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-10 font-sans">
-      <div className="max-w-4xl mx-auto space-y-6">
-        
-        {/* Header Petugas */}
-        <div className="flex items-center justify-between pb-6 border-b border-slate-800">
-          <div>
-            <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-bold border border-blue-500/20">
-              ROLE: PETUGAS STASIUN
-            </span>
-            <h1 className="text-3xl font-black text-white mt-2">Portal Validasi Boarding Tiket</h1>
-            <p className="text-slate-400 text-sm">Pemeriksaan & Validasi Tiket Penumpang Kereta Api</p>
+    <div className="min-h-screen bg-slate-50 text-slate-800 p-4 md:p-8">
+      <div className="max-w-5xl mx-auto space-y-6">
+        {/* Error Notification */}
+        {errorMsg && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl flex items-center justify-between text-sm shadow-sm">
+            <span>{errorMsg}</span>
+            <button onClick={() => setErrorMsg(null)} className="font-semibold underline ml-4">
+              Tutup
+            </button>
           </div>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 rounded-xl bg-rose-600/20 text-rose-400 border border-rose-500/30 text-xs font-semibold hover:bg-rose-600/30 transition-colors"
-          >
-            Keluar Akun
-          </button>
+        )}
+
+        {/* Success Notification */}
+        {successMsg && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-2xl flex items-center justify-between text-sm shadow-sm">
+            <span>{successMsg}</span>
+            <button onClick={() => setSuccessMsg(null)} className="font-semibold underline ml-4">
+              Tutup
+            </button>
+          </div>
+        )}
+
+        {/* Header Bar */}
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="px-3 py-1 text-xs font-bold rounded-full bg-blue-100 text-blue-700">
+                ROLE: PETUGAS STASIUN
+              </span>
+              <span className="px-3 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Gate Boarding Aktif (Supabase)
+              </span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Portal Validasi Boarding Tiket
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Pemeriksaan & Validasi Tiket Penumpang Berbayar (PAID) secara langsung dengan Supabase.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={fetchPassengers}
+              disabled={loading}
+              className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-sm transition"
+            >
+              Refresh Data
+            </button>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 text-sm font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 shadow-sm transition"
+            >
+              Keluar Akun
+            </button>
+          </div>
         </div>
 
-        {/* Input Validasi */}
-        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-          <h3 className="font-bold text-white text-lg">Input / Scan Kode Booking Tiket</h3>
-          <form onSubmit={handleCheckin} className="flex gap-3">
+        {/* Scanner / Manual Input Box */}
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-3">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+            <span>Input / Scan Kode Booking Tiket</span>
+          </label>
+          <form onSubmit={handleValidateTicket} className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
-              value={kode}
-              onChange={(e) => setKode(e.target.value)}
-              placeholder="Contoh: KAI-L7812A"
-              className="flex-1 px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono uppercase text-sm focus:outline-none focus:border-blue-500"
+              placeholder="CONTOH: KAI-H02JF"
+              value={kodeInput}
+              onChange={(e) => setKodeInput(e.target.value.toUpperCase())}
+              className="flex-1 px-4 py-3 font-mono font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <button
               type="submit"
-              className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-sm text-white transition-all"
+              disabled={isValidating}
+              className="px-6 py-3 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-2xl shadow-sm transition"
             >
-              Validasi Tiket
+              {isValidating ? 'Memvalidasi...' : 'Validasi Tiket'}
             </button>
           </form>
-
-          {status && (
-            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
-              ✅ {status}
-            </div>
-          )}
         </div>
 
-        {/* Daftar Penumpang */}
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden">
-          <div className="p-4 border-b border-slate-800 font-semibold text-white text-sm">
-            Daftar Penumpang Siap Boarding (KA-67 Taksaka Malam)
-          </div>
-          <div className="divide-y divide-slate-800">
-            <div className="p-4 flex items-center justify-between">
-              <div>
-                <p className="font-bold text-white">Budi Santoso</p>
-                <p className="text-xs text-slate-400">Kode: <span className="font-mono text-orange-400">KAI-L7812A</span> | Kursi: Eksekutif 1 - 1A</p>
-              </div>
-              <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                BOARDED ✅
-              </span>
+        {/* Passenger List Ready for Boarding */}
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-slate-100">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Daftar Penumpang Siap Boarding (Tiket Lunas)
+              </h2>
+              <p className="text-xs text-slate-400">
+                Semua tiket berstatus PAID di Supabase otomatis tampil di sini.
+              </p>
             </div>
-            <div className="p-4 flex items-center justify-between">
-              <div>
-                <p className="font-bold text-white">Siti Rahmawati</p>
-                <p className="text-xs text-slate-400">Kode: <span className="font-mono text-orange-400">KAI-P4491X</span> | Kursi: Eksekutif 1 - 1B</p>
-              </div>
-              <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                BELUM CHECK-IN
+            <div className="flex items-center gap-2 text-xs">
+              <span className="px-3 py-1 font-bold rounded-lg bg-slate-100 text-slate-600">
+                Total: {totalSiap} Penumpang
+              </span>
+              <span className="px-3 py-1 font-bold rounded-lg bg-amber-100 text-amber-700">
+                Belum: {belumCheckIn}
+              </span>
+              <span className="px-3 py-1 font-bold rounded-lg bg-emerald-100 text-emerald-700">
+                Boarded: {sudahBoarded}
               </span>
             </div>
           </div>
-        </div>
 
+          <div className="space-y-3">
+            {loading ? (
+              <div className="text-center py-12 text-slate-400 text-sm">
+                Menyinkronkan daftar penumpang dari Supabase...
+              </div>
+            ) : passengers.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-sm">
+                Belum ada tiket berstatus PAID. Silakan ubah status tiket ke PAID di Portal Admin terlebih dahulu.
+              </div>
+            ) : (
+              passengers.map((p) => {
+                const isBoarded = p.statusTiket === 'BOARDED';
+                return (
+                  <div
+                    key={p.id}
+                    className="p-4 rounded-2xl border border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm transition flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-base">
+                          {p.namaPenumpang}
+                        </span>
+                        <span className="px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-600">
+                          {p.namaKereta}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-500 flex items-center gap-3">
+                        <span>
+                          Kode: <strong className="font-mono text-blue-600">{p.kodeBooking}</strong>
+                        </span>
+                        <span>•</span>
+                        <span>
+                          Kursi: <strong className="text-slate-700">{p.posisiKursi}</strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      {isBoarded ? (
+                        <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          ✓ SUDAH BOARDING (CHECKED-IN)
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleCheckInCard(p)}
+                          className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 shadow-sm transition"
+                        >
+                          BELUM CHECK-IN (Check-in Sekarang →)
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
