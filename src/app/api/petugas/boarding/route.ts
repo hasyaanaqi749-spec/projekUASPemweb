@@ -192,7 +192,7 @@ export async function POST(request: Request) {
 
     // 3. Cek apakah seluruh penumpang pada tiket ini sudah pernah di-boarding
     const semuaSudahBoarding = booking.detailTiket.length > 0 &&
-      booking.detailTiket.every((t) => t.statusTiket === 'BOARDED');
+      booking.detailTiket.every((t: any) => t.statusTiket === 'BOARDED');
 
     if (semuaSudahBoarding) {
       return NextResponse.json(
