@@ -1,58 +1,68 @@
+// src/app/api/push/subscribe/route.ts
+// ========================================================================
+// SISTEM INFORMASI KERETA API (KELOMPOK 14)
+// Route Handler: Menyimpan Web Push Subscription Token ke Supabase
+// ========================================================================
+
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuth } from '@/lib/auth';
+import { getSessionUser } from '@/lib/auth';
 
-export async function POST(req: Request) {
+export const dynamic = 'force-dynamic';
+
+export async function POST(request: Request) {
   try {
-    // 1. Pastikan pengguna login
-    const user = await requireAuth();
-
-    const body = await req.json();
+    const body = await request.json();
     const { endpoint, keys, userAgent } = body;
 
-    if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
       return NextResponse.json(
-        { error: 'Payload PushSubscription tidak lengkap.' },
+        { error: 'Payload Push Subscription tidak lengkap.' },
         { status: 400 }
       );
     }
 
-    // 2. Simpan atau perbarui subscription (UPSERT)
-    // Menggunakan composite unique (userId, endpoint) yang sudah kita rancang di schema.prisma
+    // Ambil data user yang sedang login (jika ada sesi)
+    const sessionUser = await getSessionUser();
+    
+    // Jika tidak ada user login, gunakan akun penumpang demo default
+    const userId = sessionUser?.id || '33333333-3333-3333-3333-333333333333';
+
+    // Simpan atau perbarui subscription di tabel push_subscriptions Supabase
     const subscription = await prisma.pushSubscription.upsert({
       where: {
         userId_endpoint: {
-          userId: user.id,
-          endpoint,
+          userId: userId,
+          endpoint: endpoint,
         },
       },
       update: {
         keysP256dh: keys.p256dh,
         keysAuth: keys.auth,
-        userAgent: userAgent || 'Browser',
+        userAgent: userAgent || 'Browser Web Client',
         updatedAt: new Date(),
       },
       create: {
-        userId: user.id,
-        endpoint,
+        userId: userId,
+        endpoint: endpoint,
         keysP256dh: keys.p256dh,
         keysAuth: keys.auth,
-        userAgent: userAgent || 'Browser',
+        userAgent: userAgent || 'Browser Web Client',
       },
     });
 
     return NextResponse.json({
       success: true,
-      message: 'Perangkat berhasil terdaftar untuk Web Push Notification.',
+      message: 'Web Push Subscription berhasil didaftarkan.',
       id: subscription.id,
     });
   } catch (error: any) {
-    if (error.message === 'UNAUTHORIZED') {
-      return NextResponse.json({ error: 'Silakan login terlebih dahulu.' }, { status: 401 });
-    }
-    console.error('[PUSH SUBSCRIBE ERROR]:', error);
+    console.error('[API PUSH SUBSCRIBE ERROR]:', error);
     return NextResponse.json(
-      { error: 'Gagal mendaftarkan Web Push Notification.' },
+      {
+        success: false,
+        error: error.message || 'Gagal menyimpan subscription notifikasi.',
+      },
       { status: 500 }
     );
   }
