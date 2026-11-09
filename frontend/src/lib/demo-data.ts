@@ -1,0 +1,100 @@
+import type { Train, Booking } from "@/types/railink";
+
+export const demoTrains: Train[] = [
+  {
+    id: "1",
+    code: "KA001",
+    name: "Argo Bromo Anggrek",
+    className: "Eksekutif",
+    origin: "Jakarta",
+    destination: "Surabaya",
+    departure: "08:00",
+    arrival: "16:30",
+    duration: "8 jam 30 menit",
+    price: 650000,
+    availableSeats: 45,
+  },
+  {
+    id: "2",
+    code: "KA002",
+    name: "Gajayana",
+    className: "Eksekutif",
+    origin: "Jakarta",
+    destination: "Malang",
+    departure: "17:40",
+    arrival: "08:15",
+    duration: "14 jam 35 menit",
+    price: 550000,
+    availableSeats: 32,
+  },
+  {
+    id: "3",
+    code: "KA003",
+    name: "Bima",
+    className: "Eksekutif",
+    origin: "Surabaya",
+    destination: "Jakarta",
+    departure: "19:20",
+    arrival: "04:45",
+    duration: "9 jam 25 menit",
+    price: 620000,
+    availableSeats: 28,
+  },
+  {
+    id: "4",
+    code: "KA004",
+    name: "Jayabaya",
+    className: "Ekonomi",
+    origin: "Malang",
+    destination: "Jakarta",
+    departure: "11:50",
+    arrival: "02:30",
+    duration: "14 jam 40 menit",
+    price: 350000,
+    availableSeats: 56,
+  },
+  {
+    id: "5",
+    code: "KA005",
+    name: "Malioboro Ekspres",
+    className: "Ekonomi",
+    origin: "Malang",
+    destination: "Yogyakarta",
+    departure: "08:30",
+    arrival: "14:00",
+    duration: "5 jam 30 menit",
+    price: 180000,
+    availableSeats: 60,
+  },
+];
+
+export const demoBookings: Booking[] = [
+  {
+    id: "1",
+    code: "RLK-20261101-001",
+    passenger: "Andi Saputra",
+    train: "Argo Bromo Anggrek",
+    route: "Jakarta - Surabaya",
+    date: "2026-11-10",
+    total: 650000,
+    status: "PAID",
+  },
+  {
+    id: "2",
+    code: "RLK-20261101-002",
+    passenger: "Budi Santoso",
+    train: "Gajayana",
+    route: "Jakarta - Malang",
+    date: "2026-11-12",
+    total: 550000,
+    status: "PENDING",
+  },
+];
+
+export function formatRupiah(value: number) {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
