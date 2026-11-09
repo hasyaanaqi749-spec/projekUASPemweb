@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+:root {
+  --navy: #10243b;
+  --navy-light: #183653;
+  --blue: #2463eb;
+  --orange: #f28a35;
+  --ink: #172b42;
+  --muted: #718096;
+  --line: #e6ebf2;
+  --surface: #ffffff;
+  --background: #f4f7fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+a {
+  text-decoration: none;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.container {
+  width: min(1160px, calc(100% - 40px));
+  margin-inline: auto;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 12px 35px rgba(16, 36, 59, 0.055);
+}
+
+.field {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid #dce4ee;
+  border-radius: 11px;
+  background: white;
+  color: var(--ink);
+  outline: none;
+}
+
+.field:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(36, 99, 235, 0.1);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 19px;
+  border: none;
+  border-radius: 11px;
+  background: var(--blue);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn:hover {
+  background: #174fc9;
+  transform: translateY(-1px);
+}
+
+.btn-orange {
+  background: var(--orange);
+}
+
+.btn-orange:hover {
+  background: #dc7422;
+}
+
+.btn-outline {
+  border: 1px solid #d7e0ec;
+  background: white;
+  color: var(--ink);
+}
+
+.eyebrow {
+  color: var(--orange);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.section-title {
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.nav-link {
+  color: #dbe5f0;
+  transition: color 0.2s;
+}
+
+.nav-link:hover {
+  color: #ffb36e;
+}
+
+.hero-pattern {
+  background:
+    radial-gradient(circle at 85% 20%, rgba(64, 128, 210, 0.32), transparent 30%),
+    radial-gradient(circle at 10% 100%, rgba(242, 138, 53, 0.16), transparent 35%),
+    linear-gradient(120deg, #10243b 0%, #183b5d 65%, #1e4c70 100%);
+}
+
+.stat-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: white;
+  padding: 18px;
+}
+
+@media (max-width: 640px) {
+  .container {
+    width: min(100% - 28px, 1160px);
+  }
+
+  .panel {
+    padding: 18px;
+    border-radius: 16px;
+  }
+}
